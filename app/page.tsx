@@ -1,103 +1,138 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import axios from 'axios';
+import { useSpeechRecognition } from 'react-speech-kit';
+
+export default function HealthcareTranslator() {
+  // App state
+  const [translatedText, setTranslatedText] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [fullTranscript, setFullTranscript] = useState('');
+
+  // Speech recognition
+  const { listen, stop, listening } = useSpeechRecognition({
+    onResult: (result) => setFullTranscript(result),
+  });
+
+  // Translation function
+  const translateText = async (text) => {
+    try {
+      setIsTranslating(true);
+      const response = await axios.post(
+        'https://api.openai.com/v1/chat/completions',
+        {
+          model: 'gpt-4-turbo',
+          messages: [{
+            role: 'user',
+            content: `As a medical translator, convert this to Spanish: ${text}. Prioritize clinical accuracy. Return ONLY the translation.`,
+          }],
+          max_tokens: 1000,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.NEXT_PUBLIC_OPENAI_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      setTranslatedText(response.data.choices[0].message.content);
+    } catch (error) {
+      console.error('Translation error:', error);
+      setTranslatedText('Translation failed. Please check your API key.');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // Speak translated text
+  const speakTranslation = () => {
+    if (!translatedText) return;
+
+    const synth = window.speechSynthesis;
+    const utterance = new SpeechSynthesisUtterance(translatedText);
+    utterance.lang = 'es-ES'; // Spanish language
+
+    // Wait for voices to be loaded
+    const voices = synth.getVoices();
+    const spanishVoice = voices.find(voice => voice.lang.startsWith('es'));
+
+    if (spanishVoice) {
+      utterance.voice = spanishVoice;
+    }
+
+    synth.cancel(); // Stop any ongoing speech
+    synth.speak(utterance); // Speak the translation
+  };
+
+  // Start recording
+  const startListening = () => {
+    setFullTranscript('');
+    listen({ continuous: true });
+  };
+
+  // Stop recording and translate
+  const stopListening = async () => {
+    stop();
+    if (fullTranscript) {
+      await translateText(fullTranscript);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <main className="min-h-screen p-8 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold text-center mb-8">Healthcare Translator</h1>
+      
+      <div className="flex gap-4 mb-8 justify-center">
+        <button
+          onClick={startListening}
+          disabled={listening || isTranslating}
+          className={`px-6 py-3 rounded-full text-lg ${
+            listening ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'
+          } text-white disabled:bg-gray-400 transition-colors`}
+        >
+          {listening ? '🛑 Recording...' : '🎤 Start Recording'}
+        </button>
+        
+        <button
+          onClick={stopListening}
+          disabled={!listening}
+          className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-full text-lg disabled:bg-gray-400 transition-colors"
+        >
+          ⏹️ Stop
+        </button>
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="mt-6 space-y-4">
+          <div>
+            <h3 className="font-medium text-gray-700">Live Transcription:</h3>
+            <p className="mt-1 p-3 border rounded-lg bg-white min-h-12">
+              {fullTranscript || (listening ? "Listening..." : "Press Start Recording")}
+            </p>
+          </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold">Translation (Spanish)</h2>
+            <button
+              onClick={speakTranslation}
+              disabled={!translatedText || isTranslating}
+              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded disabled:bg-gray-400 transition-colors"
+            >
+              🔊 Play
+            </button>
+          </div>
+          <div className="min-h-32 p-4 border rounded bg-gray-50">
+            {isTranslating ? "Translating..." : translatedText || "Translation will appear here"}
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+      </div>
+
+      {isTranslating && (
+        <div className="mt-6 text-center text-blue-600">
+          Translating medical terminology...
+        </div>
+      )}
+    </main>
   );
 }
