@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import axios from 'axios';
 import { useSpeechRecognition } from 'react-speech-kit';
 
@@ -10,13 +10,21 @@ export default function HealthcareTranslator() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [fullTranscript, setFullTranscript] = useState('');
 
-  // Speech recognition
-  const { listen, stop, listening } = useSpeechRecognition({
-    onResult: (result) => setFullTranscript(result),
-  });
+  // Speech recognition (Fix: Use returned object correctly)
+  const recognition:any = useSpeechRecognition({
+    onResult: (result: string | any) => {
+      if (result) {
+        setFullTranscript(result);
+      }
+    },
+  }) || {};  // Default to an empty object if undefined
+
+  const listen = recognition.listen || (() => {}); // Fallback to empty function
+  const stop = recognition.stop || (() => {}); // Fallback to empty function
+  const listening = recognition.listening || false; // Default to false if undefined
 
   // Translation function
-  const translateText = async (text) => {
+  const translateText = async (text: string) => {
     try {
       setIsTranslating(true);
       const response = await axios.post(
@@ -104,12 +112,12 @@ export default function HealthcareTranslator() {
       </div>
 
       <div className="mt-6 space-y-4">
-          <div>
-            <h3 className="font-medium text-gray-700">Live Transcription:</h3>
-            <p className="mt-1 p-3 border rounded-lg bg-white min-h-12">
-              {fullTranscript || (listening ? "Listening..." : "Press Start Recording")}
-            </p>
-          </div>
+        <div>
+          <h3 className="font-medium text-gray-700">Live Transcription:</h3>
+          <p className="mt-1 p-3 border rounded-lg bg-white min-h-12">
+            {fullTranscript || (listening ? "Listening..." : "Press Start Recording")}
+          </p>
+        </div>
 
         <div className="bg-white p-6 rounded-lg shadow">
           <div className="flex justify-between items-center mb-4">
