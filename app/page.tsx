@@ -33,7 +33,7 @@ export default function HealthcareTranslator() {
           model: 'gpt-4-turbo',
           messages: [{
             role: 'user',
-            content: `As a medical translator, convert this to Spanish: ${text}. Prioritize clinical accuracy. Return ONLY the translation.`,
+            content: `As a medical translator, convert this to Spanish: ${text}. Return ONLY the translation.`,
           }],
           max_tokens: 1000,
         },
@@ -73,6 +73,12 @@ export default function HealthcareTranslator() {
     synth.speak(utterance); // Speak the translation
   };
 
+  const apiKey = process.env.OPENAI_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Missing API key");
+  }
+  
   // Start recording
   const startListening = () => {
     setFullTranscript('');
