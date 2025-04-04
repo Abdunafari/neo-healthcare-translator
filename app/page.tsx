@@ -72,6 +72,7 @@ export default function HealthcareTranslator() {
     synth.cancel(); // Stop any ongoing speech
     synth.speak(utterance); // Speak the translation
   };
+  const key = process.env.NEXT_PUBLIC_GOOGLE_API_KEY; // ✅
 
   const apiKey = process.env.OPENAI_API_KEY;
 
